@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ffb3c7">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>SELI'S LITTLE WORLD</title>
+  <style>
+:root {
+  --pink: #ff7eb0;
+  --pink-soft: rgba(255, 190, 215, 0.55);
+  --ink: #3a1d33;
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #cfe8ef;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Tahoma, sans-serif;
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#camzone { position: fixed; inset: 0; touch-action: none; z-index: 1; }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; top: calc(8px + var(--safe-t)); left: calc(10px + var(--safe-l)); z-index: 5; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+#timeChip, #fps {
+  background: rgba(40, 20, 40, 0.38);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  backdrop-filter: blur(4px);
+}
+#fps { pointer-events: auto; font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+/* ---------- touch controls ---------- */
+#controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+#joyZone {
+  position: absolute; left: 0; bottom: 0; width: 46%; height: 70%;
+  pointer-events: auto; touch-action: none;
+}
+#joyBase {
+  position: absolute;
+  left: calc(80px + var(--safe-l)); bottom: calc(70px + var(--safe-b));
+  width: 118px; height: 118px; margin: -59px 0 0 -59px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: radial-gradient(circle, rgba(255,255,255,0.2), rgba(255,160,200,0.16));
+  transition: opacity 0.2s;
+  opacity: 0.55;
+}
+#joyBase:not(.active) { top: auto; }
+#joyBase.active { opacity: 1; }
+#joyKnob {
+  position: absolute; left: 50%; top: 50%;
+  width: 54px; height: 54px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #fff, #ffc2da);
+  box-shadow: 0 3px 10px rgba(120, 30, 80, 0.35);
+}
+
+#actions {
+  position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(22px + var(--safe-b));
+  width: 190px; height: 170px; pointer-events: none;
+}
+.abtn {
+  position: absolute; pointer-events: auto; touch-action: none;
+  width: 58px; height: 58px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(160deg, rgba(255,150,195,0.85), rgba(235,90,150,0.85));
+  color: #fff; font-weight: 700; font-size: 12px; letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(120, 30, 80, 0.35);
+}
+.abtn.big { width: 78px; height: 78px; right: 0; bottom: 0; font-size: 14px; }
+#btnAction { right: 88px; bottom: 6px; }
+#btnRun { right: 36px; bottom: 92px; }
+.abtn.down { transform: scale(0.92); filter: brightness(1.15); }
+.abtn.on { background: linear-gradient(160deg, #ffe27a, #ffb347); color: #5a2a00; }
+
+/* ---------- debug ---------- */
+#debug {
+  position: fixed; top: calc(40px + var(--safe-t)); left: calc(10px + var(--safe-l)); z-index: 20;
+  display: flex; flex-wrap: wrap; gap: 6px; max-width: 62vw;
+  padding: 8px; border-radius: 12px; background: rgba(30, 15, 35, 0.72);
+}
+#debug[hidden] { display: none; }
+#debug button {
+  border: 0; border-radius: 8px; padding: 6px 9px; font-size: 12px;
+  background: rgba(255, 255, 255, 0.9); color: var(--ink);
+}
+#debug .hdr { width: 100%; color: #fff; font-size: 11px; opacity: 0.8; }
+
+#toast {
+  position: fixed; left: 50%; top: calc(14px + var(--safe-t)); transform: translateX(-50%);
+  z-index: 30; padding: 8px 16px; border-radius: 14px; font-size: 14px;
+  background: rgba(255, 255, 255, 0.92); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+#toast[hidden] { display: none; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 225, 238, 0.28);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+  transition: opacity 0.9s ease, visibility 0.9s;
+}
+.overlay.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.card { text-align: center; padding: 18px 30px; }
+.card h1 {
+  margin: 0 0 6px; font-size: clamp(30px, 9vh, 64px); line-height: 1.02; letter-spacing: 2px;
+  color: #fff; text-shadow: 0 3px 0 #e8508f, 0 6px 18px rgba(120, 20, 80, 0.45);
+}
+.card .sub { margin: 0 0 16px; color: #fff; text-shadow: 0 2px 8px rgba(100,20,70,0.5); font-size: 15px; }
+button.primary {
+  border: 0; border-radius: 999px; padding: 12px 38px; font-size: 20px; font-weight: 800; letter-spacing: 1px;
+  color: #fff; background: linear-gradient(160deg, #ff8fbd, #ee4f93);
+  box-shadow: 0 6px 20px rgba(200, 40, 110, 0.45);
+}
+button.primary:active { transform: scale(0.96); }
+button.ghost { display: block; margin: 12px auto 0; border: 0; background: transparent; color: #fff; text-decoration: underline; font-size: 13px; opacity: 0.85; }
+button.ghost[hidden] { display: none; }
+
+#rotate { display: none; z-index: 60; background: rgba(40, 20, 50, 0.92); color: #fff; }
+.phone-icon { font-size: 54px; animation: tilt 1.6s ease-in-out infinite; }
+@keyframes tilt { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-90deg); } }
+body.touch #rotate { display: flex; }
+@media (orientation: landscape) { body.touch #rotate { display: none; } }
+
+#loading {
+  position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(#ffc9dd, #cfe8ef); transition: opacity 0.6s;
+}
+#loading.hide { opacity: 0; pointer-events: none; }
+.spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.7); border-top-color: #ee4f93; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* small landscape phones (e.g. 360px tall) */
+@media (max-height: 420px) {
+  #actions { transform: scale(0.88); transform-origin: right bottom; }
+  .card h1 { font-size: 34px; }
+  #joyBase { width: 104px; height: 104px; margin: -52px 0 0 -52px; }
+}
+
+</style>
+  
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- camera drag layer (sits under the controls) -->
+  <div id="camzone"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="timeChip"><span id="timeIcon">☀</span> <span id="timeText" dir="rtl"></span></div>
+    <div id="fps" title="Tap for debug panel">-- fps</div>
+  </div>
+
+  <!-- touch controls -->
+  <div id="controls">
+    <div id="joyZone"><div id="joyBase"><div id="joyKnob"></div></div></div>
+    <div id="actions">
+      <button id="btnJump" class="abtn big" aria-label="Jump">JUMP</button>
+      <button id="btnAction" class="abtn" aria-label="Interact">ACT</button>
+      <button id="btnRun" class="abtn" aria-label="Run toggle">RUN</button>
+    </div>
+  </div>
+
+  <div id="debug" hidden></div>
+  <div id="toast" hidden></div>
+
+  <!-- title screen: blurred garden behind -->
+  <div id="start" class="overlay">
+    <div class="card">
+      <h1>SELI'S<br>LITTLE WORLD</h1>
+      <p class="sub">A little 3D garden to explore</p>
+      <button id="startBtn" class="primary">START ♡</button>
+      <button id="resetBtn" class="ghost" hidden>New game</button>
+    </div>
+  </div>
+
+  <div id="rotate" class="overlay">
+    <div class="card">
+      <div class="phone-icon">📱</div>
+      <p>Please rotate your phone to landscape</p>
+      <p dir="rtl">لطفاً گوشی را افقی کنید</p>
+    </div>
+  </div>
+
+  <div id="loading"><div class="spinner"></div><p id="loadingText">Loading…</p></div>
+
+  <script>
+    // If the game script fails (no internet / CDN blocked / old browser), say so instead of spinning forever.
+    function showErr(msg) {
+      var t = document.getElementById('loadingText');
+      if (t) t.innerHTML = 'Could not start the game.<br>' + msg + '<br><small>Check your internet connection and use an up-to-date Chrome.</small>';
+      var s = document.querySelector('#loading .spinner');
+      if (s) s.style.display = 'none';
+    }
+    window.addEventListener('error', function (e) { showErr(String(e.message || 'script error')); });
+    window.addEventListener('unhandledrejection', function (e) { showErr(String(e.reason)); });
+    setTimeout(function () { if (document.getElementById('loading') && !document.getElementById('loading').classList.contains('hide')) showErr('Loading is taking too long.'); }, 100000);
+  </script>
+  
+  <script type="text/plain" id="gamecode">(() => {
+  // src/util.js
+  var THREE = globalThis.__THREE;
+  function mergeGeometries(list) {
+    const names = ["position", "normal", "color"];
+    const out = new THREE.BufferGeometry();
+    for (const n of names) {
+      let total = 0;
+      for (const g of list) total += g.attributes[n].array.length;
+      const arr = new Float32Array(total);
+      let o = 0;
+      for (const g of list) {
+        arr.set(g.attributes[n].array, o);
+        o += g.attributes[n].array.length;
+      }
+      out.setAttribute(n, new THREE.BufferAttribute(arr, 3));
+    }
+    return out;
+  }
+  var TAU = Math.PI * 2;
+  var clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  var lerp = (a, b, t) => a + (b - a) * t;
+  var smooth = (a, b, x) => {
+    const t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  var damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  function angleDiff(a, b) {
+    let d = (b - a) % TAU;
+    if (d > Math.PI) d -= TAU;
+    if (d < -Math.PI) d += TAU;
+    return d;
+  }
+  var dampAngle = (a, b, k, dt) => a + angleDiff(a, b) * (1 - Math.exp(-k * dt));
+  function rng(seed = 1) {
+    let s = seed | 0;
+    return function() {
+      s = s + 1831565813 | 0;
+      let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function M(x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+    return new THREE.Matrix4().compose(
+      new THREE.Vector3(x, y, z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
+      new THREE.Vector3(sx, sy, sz)
+    );
+  }
+  function part(geo, color, matrix) {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    g.deleteAttribute("uv");
+    if (matrix) g.applyMatrix4(matrix);
+    const c = new THREE.Color(color);
+    const n = g.attributes.position.count;
+    const arr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      arr[i * 3] = c.r;
+      arr[i * 3 + 1] = c.g;
+      arr[i * 3 + 2] = c.b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+    return g;
+  }
+  function mergeParts(parts) {
+    const g = mergeGeometries(parts, false);
+    parts.forEach((p) => p.dispose());
+    g.computeBoundingSphere();
+    return g;
+  }
+  function canvasTexture(w, h, draw, { repeat = null, srgb = true } = {}) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    draw(c.getContext("2d"), w, h);
+    const t = new THREE.CanvasTexture(c);
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    if (repeat) {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(repeat, repeat);
+    }
+    return t;
+  }
+  function radialTexture(stops, size = 64) {
+    return canvasTexture(size, size, (ctx, w, h) => {
+      const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+      stops.forEach(([o, col]) => g.addColorStop(o, col));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    });
+  }
+  var vcLambert = (extra = {}) => new THREE.MeshLambertMaterial({ vertexColors: true, ...extra });
+
+  // src/house.js
+  var THREE2 = globalThis.__THREE;
+  function buildHouse(H) {
+    const parts = [];
+    const panes = [];
+    const colliders = [];
+    const hx = H.w / 2;
+    const hz = H.d / 2;
+    const wallH = 5.2;
+    const baseY = 0.5;
+    const front = H.z + hz;
+    const box = (w, h, d, c, x, y, z, ry = 0) => parts.push(part(new THREE2.BoxGeometry(w, h, d), c, M(x, y, z, 0, ry, 0)));
+    const WALL = 16238276;
+    const TRIM = 16775408;
+    const TEAL = 2602406;
+    const ROOF = 12734781;
+    box(H.w + 0.6, baseY, H.d + 0.6, 12235434, H.x, baseY / 2, H.z);
+    box(H.w, wallH, H.d, WALL, H.x, baseY + wallH / 2, H.z);
+    box(H.w + 0.2, 0.25, H.d + 0.2, TRIM, H.x, baseY + wallH - 0.15, H.z);
+    box(H.w + 0.2, 0.2, H.d + 0.2, TRIM, H.x, baseY + 0.1, H.z);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.45, wallH, 0.45, TRIM, H.x + sx * hx, baseY + wallH / 2, H.z + sz * hz);
+    const roof = new THREE2.ConeGeometry(1, 3.4, 4, 1);
+    roof.rotateY(Math.PI / 4);
+    parts.push(part(roof, ROOF, M(H.x, baseY + wallH + 1.7, H.z, 0, 0, 0, (H.w + 2.8) / 1.4142, 1, (H.d + 2.8) / 1.4142)));
+    box(H.w + 2.4, 0.22, H.d + 2.4, 11026735, H.x, baseY + wallH + 0.05, H.z);
+    box(1.2, 3.2, 1.2, 11818815, H.x + 7, baseY + wallH + 2.2, H.z - 3);
+    box(1.5, 0.25, 1.5, 9275264, H.x + 7, baseY + wallH + 3.9, H.z - 3);
+    const porchW = 8;
+    const porchD = 3.4;
+    box(porchW, 0.4, porchD, 14275272, H.x, 0.2, front + porchD / 2);
+    box(3.6, 0.22, 1, 13617341, H.x, 0.11, front + porchD + 0.5);
+    for (const sx of [-1, 1]) {
+      parts.push(part(new THREE2.CylinderGeometry(0.17, 0.2, 3.6, 10), TRIM, M(H.x + sx * 3.4, 2.2, front + porchD - 0.3)));
+      colliders.push({ x: H.x + sx * 3.4, z: front + porchD - 0.3, r: 0.3 });
+    }
+    box(porchW + 1, 0.28, porchD + 0.6, TEAL, H.x, 4.1, front + porchD / 2 + 0.1);
+    box(porchW + 1, 0.12, 0.2, 2002819, H.x, 3.9, front + porchD + 0.35);
+    box(2.1, 3.4, 0.2, TRIM, H.x, baseY + 1.7, front + 0.08);
+    box(1.6, 3, 0.2, TEAL, H.x, baseY + 1.5, front + 0.15);
+    parts.push(part(new THREE2.SphereGeometry(0.09, 8, 6), 15909198, M(H.x + 0.55, baseY + 1.5, front + 0.3)));
+    box(0.9, 0.9, 0.06, 2002819, H.x, baseY + 2.1, front + 0.26);
+    const win = (x, y, z, ry, w = 2.2, h = 2.3) => {
+      const nx = Math.sin(ry);
+      const nz = Math.cos(ry);
+      parts.push(part(new THREE2.BoxGeometry(w + 0.4, h + 0.4, 0.2), TRIM, M(x, y, z, 0, ry, 0)));
+      panes.push(part(new THREE2.BoxGeometry(w, h, 0.22), 12575730, M(x + nx * 0.02, y, z + nz * 0.02, 0, ry, 0)));
+      parts.push(part(new THREE2.BoxGeometry(0.1, h, 0.26), TRIM, M(x + nx * 0.04, y, z + nz * 0.04, 0, ry, 0)));
+      parts.push(part(new THREE2.BoxGeometry(w, 0.1, 0.26), TRIM, M(x + nx * 0.04, y, z + nz * 0.04, 0, ry, 0)));
+      for (const s of [-1, 1]) {
+        const ox = Math.cos(ry) * s * (w / 2 + 0.55);
+        const oz = -Math.sin(ry) * s * (w / 2 + 0.55);
+        parts.push(part(new THREE2.BoxGeometry(0.7, h + 0.2, 0.1), TEAL, M(x + ox, y, z + oz, 0, ry, 0)));
+      }
+      const fx = x + nx * 0.35;
+      const fz = z + nz * 0.35;
+      parts.push(part(new THREE2.BoxGeometry(w + 0.5, 0.35, 0.5), 9067066, M(fx, y - h / 2 - 0.35, fz, 0, ry, 0)));
+      const cols = [16735631, 16765517, 16777215, 16748487, 11568383];
+      for (let i = 0; i < 7; i++) {
+        const t = (i / 6 - 0.5) * (w + 0.2);
+        parts.push(part(new THREE2.IcosahedronGeometry(0.16, 0), cols[i % cols.length], M(fx + Math.cos(ry) * t, y - h / 2 - 0.05, fz - Math.sin(ry) * t)));
+        parts.push(part(new THREE2.IcosahedronGeometry(0.2, 0), 4168518, M(fx + Math.cos(ry) * t, y - h / 2 - 0.22, fz - Math.sin(ry) * t)));
+      }
+    };
+    for (const sx of [-1, 1]) {
+      win(H.x + sx * 4.2, baseY + 2.9, front + 0.1, 0);
+      win(H.x + sx * 8.6, baseY + 2.9, front + 0.1, 0);
+    }
+    for (const sx of [-1, 1]) {
+      win(H.x + sx * (hx + 0.1), baseY + 2.9, H.z - 3.2, sx * (Math.PI / 2));
+      win(H.x + sx * (hx + 0.1), baseY + 2.9, H.z + 3.2, sx * (Math.PI / 2));
+    }
+    for (const x of [-7, 0, 7]) win(H.x + x, baseY + 2.9, H.z - hz - 0.1, Math.PI);
+    for (const sx of [-1, 1]) {
+      parts.push(part(new THREE2.BoxGeometry(0.3, 0.5, 0.3), 2829099, M(H.x + sx * 1.9, baseY + 2.6, front + 0.25)));
+    }
+    colliders.push({ minX: H.x - hx - 0.3, maxX: H.x + hx + 0.3, minZ: H.z - hz - 0.3, maxZ: front + 0.3 });
+    const geometry = mergeParts(parts);
+    const paneGeometry = mergeParts(panes);
+    return {
+      geometry,
+      paneGeometry,
+      colliders,
+      door: { x: H.x, z: front },
+      porchFront: front + porchD + 1
+    };
+  }
+
+  // src/world.js
+  var THREE3 = globalThis.__THREE;
+  var GARDEN = 38;
+  var HOUSE = { x: 0, z: -24, w: 24, d: 16 };
+  var POND = { x: -20, z: 4, r: 6 };
+  var GAZEBO = { x: 22, z: 4, r: 3.4 };
+  function pathX(z) {
+    const t = clamp((z + 14.5) / 12, 0, 1);
+    return Math.sin((z + 14.5) * 0.17) * 2.4 * t;
+  }
+  var PATH_START = 36.5;
+  var PATH_END = -14.6;
+  function buildWorld(scene2, quality2) {
+    const world2 = {
+      group: new THREE3.Group(),
+      colliders: [],
+      uTime: { value: 0 },
+      lanternMats: [],
+      glowSprites: [],
+      windowMat: null,
+      fish: [],
+      spawn: { x: pathX(26) + 0.5, z: 26, yaw: Math.PI },
+      landmarks: {}
+    };
+    const g = world2.group;
+    scene2.add(g);
+    const R = rng(1234);
+    const low = quality2.low;
+    const isFree = (x, z, pad = 0) => {
+      if (Math.abs(x) > GARDEN - 1.2 || Math.abs(z) > GARDEN - 1.2) return false;
+      if (Math.abs(x - HOUSE.x) < HOUSE.w / 2 + 1.8 + pad && z < -11.5 + pad) return false;
+      if (Math.hypot(x - POND.x, z - POND.z) < POND.r + 1.6 + pad) return false;
+      if (Math.hypot(x - GAZEBO.x, z - GAZEBO.z) < GAZEBO.r + 1.2 + pad) return false;
+      if (z > PATH_END - 0.5 && z < PATH_START + 1.5 && Math.abs(x - pathX(z)) < 1.5 + pad) return false;
+      return true;
+    };
+    {
+      const tex = canvasTexture(256, 256, (ctx, w, h) => {
+        ctx.fillStyle = "#5fae3c";
+        ctx.fillRect(0, 0, w, h);
+        const r = rng(5);
+        for (let i = 0; i < 900; i++) {
+          const light = r() > 0.5;
+          ctx.fillStyle = light ? `rgba(150,215,80,${0.12 + r() * 0.2})` : `rgba(30,100,40,${0.12 + r() * 0.2})`;
+          const s = 2 + r() * 7;
+          ctx.beginPath();
+          ctx.ellipse(r() * w, r() * h, s, s * (0.4 + r() * 0.8), r() * 3, 0, TAU);
+          ctx.fill();
+        }
+        for (let i = 0; i < 700; i++) {
+          ctx.strokeStyle = `rgba(${40 + r() * 40},${120 + r() * 70},${30 + r() * 30},0.5)`;
+          ctx.lineWidth = 1;
+          const x = r() * w;
+          const y = r() * h;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + (r() - 0.5) * 4, y - 3 - r() * 4);
+          ctx.stroke();
+        }
+      }, { repeat: 140 });
+      tex.anisotropy = low ? 1 : 4;
+      const ground = new THREE3.Mesh(new THREE3.PlaneGeometry(520, 520), new THREE3.MeshLambertMaterial({ map: tex }));
+      ground.rotation.x = -Math.PI / 2;
+      g.add(ground);
+      const patchGeo = new THREE3.CircleGeometry(1, 18);
+      patchGeo.rotateX(-Math.PI / 2);
+      const patches = new THREE3.InstancedMesh(patchGeo, new THREE3.MeshLambertMaterial({ transparent: true, opacity: 0.35, depthWrite: false }), 34);
+      const m42 = new THREE3.Matrix4();
+      const greens = [9424986, 5216824, 10999914, 4164156, 7914061];
+      for (let i = 0; i < 34; i++) {
+        const s = 4 + R() * 9;
+        m42.compose(
+          new THREE3.Vector3((R() - 0.5) * 78, 0.012 + i * 2e-4, (R() - 0.5) * 78),
+          new THREE3.Quaternion(),
+          new THREE3.Vector3(s * (0.8 + R() * 0.8), 1, s)
+        );
+        patches.setMatrixAt(i, m42);
+        patches.setColorAt(i, new THREE3.Color(greens[i % greens.length]));
+      }
+      g.add(patches);
+    }
+    {
+      const blades = 4;
+      const pos = [];
+      const col = [];
+      const dark = new THREE3.
